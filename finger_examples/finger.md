@@ -38,4 +38,5 @@ para probar el resultado
 telnet 127.0.0.1 1079
 ```
 
-se conectará al servidor, ahora ye empieza a parecerse a un comando escribes algo y te da un resultado o un error, pero lo estamos manejando de manera sincrona aun
+ahora ya por fin tenemos como se ve el código nuevo en twsited o sea tenemos la versión con async/await y la otra con callbacks.
+Ojo en ambas es posible usar async/await pero la de task react parece intimidante al principio y quería desmitificarla.

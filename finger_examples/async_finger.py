@@ -8,11 +8,18 @@ from twisted.protocols import basic
 
 
 class FingerProtocol(basic.LineReceiver):
-    def lineReceived(self, user): # ahora espera un parámetro
-        # ahora regresamos "algo" pero desde el factory
-        # si leiste el README.md los protocolos no deben tener datos
-        self.transport.write(self.factory.getUser(user) + b"\r\n")
-        self.transport.loseConnection() # y se sigue desconectando
+    def lineReceived(self, user): # twisted inició con las marcas sincronas de python
+        defer.ensureDeferred(self.handle_line(user)) # sólo tenemos que "marcar" que estamos recibiendo un deferred
+
+    async def handle_line(self, user): # marcamos async para usar await dentro del método
+        try:
+            # Get the result from the factory
+            result = await self.factory.getUser(user)
+            self.transport.write(result + b"\r\n")
+        except Exception:
+            self.transport.write(b"Internal error in server\r\n")
+        finally:
+            self.transport.loseConnection()
 
 
 class FingerFactory(protocol.ServerFactory):
@@ -22,8 +29,8 @@ class FingerFactory(protocol.ServerFactory):
     def __init__(self, users):
         self.users = users
 
-    def getUser(self, user): # "persistencia" de momento
-        return self.users.get(user, b"No such user") # ahora si buscamos algo
+    def getUser(self, user): # regresa un deferred, no lo marcamos async
+        return defer.succeed(self.users.get(user, b"No such user")) # convertimos lo sincrono en asincrono
 
 
 async def main(reactor):

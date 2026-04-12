@@ -1,4 +1,5 @@
 from twisted.internet import (
+    defer,
     endpoints,
     protocol,
     reactor,
@@ -7,11 +8,19 @@ from twisted.protocols import basic
 
 
 class FingerProtocol(basic.LineReceiver):
-    def lineReceived(self, user): # ahora espera un parámetro
-        # ahora regresamos "algo" pero desde el factory
-        # si leiste el README.md los protocolos no deben tener datos
-        self.transport.write(self.factory.getUser(user) + b"\r\n")
-        self.transport.loseConnection() # y se sigue desconectando
+    def lineReceived(self, user):
+        d = self.factory.getUser(user) # obtenermos un deferred al cual podemos colgarle callbacks
+
+        def onError(err): # esto es una función callback, no tiene self, incluso podría estar fuera de este scope
+            return "Internal error in server"
+
+        d.addErrback(onError) # agregamos el error calback
+
+        def writeResponse(message): # esto es una función callback, no tiene self, incluso podría estar fuera de este scope
+            self.transport.write(message + b"\r\n")
+            self.transport.loseConnection()
+
+        d.addCallback(writeResponse) # agregamos el callback de caso exitoso
 
 
 class FingerFactory(protocol.ServerFactory):
@@ -21,8 +30,8 @@ class FingerFactory(protocol.ServerFactory):
     def __init__(self, users):
         self.users = users
 
-    def getUser(self, user): # "persistencia" de momento
-        return self.users.get(user, b"No such user") # ahora si buscamos algo
+    def getUser(self, user):
+        return defer.succeed(self.users.get(user, b"No such user")) # convertimos lo sincrono en asincrono
 
 
 def main(): # no es necesaria esta función, pero se ve más agrupado
