@@ -3,6 +3,7 @@ from twisted.internet import (
     endpoints,
     protocol,
     reactor,
+    utils,
 )
 from twisted.protocols import basic
 
@@ -31,7 +32,7 @@ class FingerFactory(protocol.ServerFactory):
         self.users = users
 
     def getUser(self, user):
-        return defer.succeed(self.users.get(user, b"No such user")) # convertimos lo sincrono en asincrono
+        return utils.getProcessOutput(b"finger", [user])
 
 
 def main(): # no es necesaria esta función, pero se ve más agrupado
