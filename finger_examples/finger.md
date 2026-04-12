@@ -38,4 +38,4 @@ para probar el resultado
 telnet 127.0.0.1 1079
 ```
 
-se conectará al servidor, te dará un prompt para que escribas algo y te regresa un "error" y... se desconctará inmediatamente ... seguimos mostrando cosas de los protocolos
+se conectará al servidor, te dará un prompt para que escribas algo y te regresa un "error" y... se desconctará inmediatamente ... pero esta vez mostrando donde realmente deben venir los datos

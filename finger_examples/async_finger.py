@@ -9,13 +9,18 @@ from twisted.protocols import basic
 
 class FingerProtocol(basic.LineReceiver):
     def lineReceived(self, user): # ahora espera un parámetro
-        self.transport.write(b"No such user\r\n") # ahora simplemente damos un "error"
+        # ahora regresamos "algo" pero desde el factory
+        # si leiste el README.md los protocolos no deben tener datos
+        self.transport.write(self.factory.getUser(user) + b"\r\n")
         self.transport.loseConnection() # y se sigue desconectando
 
 
 class FingerFactory(protocol.ServerFactory):
     # inicia el protocolo y maneja persistencia
     protocol = FingerProtocol
+
+    def getUser(self, user): # "persistencia" de momento
+        return b"No such user" # regresamos un "error"
 
 
 async def main(reactor):
