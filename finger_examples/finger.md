@@ -38,5 +38,4 @@ para probar el resultado
 telnet 127.0.0.1 1079
 ```
 
-se conectará pero no hab´ra ningun resultado en pantalla puesto que el protocolo hace absolutamente nada.
-
+se conectará al servidor ... y se desconctará inmediatamente ... sólo es un ejemplo de que si realmente hace algo, además de que muestra a bajo nivel la comunicación con transport, hey protocolos más avanzados que no escriben directamente sobre ese atributo y lo hacen con métodos.

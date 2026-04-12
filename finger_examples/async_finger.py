@@ -7,10 +7,12 @@ from twisted.internet import (
 
 
 class FingerProtocol(protocol.Protocol):
-    pass
+    def connectionMade(self): # reescribimos el método para que haga algo
+        self.transport.loseConnection() # como... desconectarse...
 
 
 class FingerFactory(protocol.ServerFactory):
+    # inicia el protocolo y maneja persistencia
     protocol = FingerProtocol
 
 
