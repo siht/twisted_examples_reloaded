@@ -9,6 +9,7 @@ from twisted.protocols import basic
 
 class FingerProtocol(basic.LineReceiver):
     def lineReceived(self, user): # ahora espera un parámetro
+        self.transport.write(b"No such user\r\n") # ahora simplemente damos un "error"
         self.transport.loseConnection() # y se sigue desconectando
 
 
