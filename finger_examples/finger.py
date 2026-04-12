@@ -1,11 +1,10 @@
 from twisted.internet import (
-    defer,
     endpoints,
     protocol,
     reactor,
-    utils,
 )
 from twisted.protocols import basic
+from twisted.web import client
 
 
 class FingerProtocol(basic.LineReceiver):
@@ -28,16 +27,16 @@ class FingerFactory(protocol.ServerFactory):
     # inicia el protocolo y maneja persistencia
     protocol = FingerProtocol
 
-    def __init__(self, users):
-        self.users = users
+    def __init__(self, prefix):
+        self.prefix = prefix
 
     def getUser(self, user):
-        return utils.getProcessOutput(b"finger", [user])
+        return client.getPage(self.prefix + user) # oh no. twisted ya no tiene esto :c
 
 
 def main(): # no es necesaria esta función, pero se ve más agrupado
     fingerEndpoint = endpoints.serverFromString(reactor, "tcp:1079")
-    fingerEndpoint.listen(FingerFactory({b"moshez": b"Happy and well"}))
+    fingerEndpoint.listen(FingerFactory(prefix=b"http://livejournal.com/~")) # y encima esta url ya no existe
     reactor.run()
 
 

@@ -6,6 +6,7 @@ from twisted.internet import (
     utils,
 )
 from twisted.protocols import basic
+from twisted.web import client
 
 
 class FingerProtocol(basic.LineReceiver):
@@ -27,16 +28,16 @@ class FingerFactory(protocol.ServerFactory):
     # inicia el protocolo y maneja persistencia
     protocol = FingerProtocol
 
-    def __init__(self, users):
-        self.users = users
+    def __init__(self, prefix):
+        self.prefix = prefix
 
-    def getUser(self, user): # regresa un deferred, no lo marcamos async
-        return utils.getProcessOutput(b"finger", [user])
+    def getUser(self, user):
+        return client.getPage(self.prefix + user) # oh no. twisted ya no tiene esto :c
 
 
 async def main(reactor):
     fingerEndpoint = endpoints.serverFromString(reactor, "tcp:1079")
-    fingerEndpoint.listen(FingerFactory({b"moshez": b"Happy and well"}))
+    fingerEndpoint.listen(FingerFactory(prefix=b"http://livejournal.com/~")) # y encima esta url ya no existe
     # la siguiente instrucción no es una forma de arrancar el reactor
     # simplemente regresa un deferred para que no se acabe el bucle
     await defer.Deferred() 
