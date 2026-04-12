@@ -1,12 +1,30 @@
+from twisted.internet import (
+    defer,
+    endpoints,
+    protocol,
+    task,
+)
 
-import sys
 
-from twisted.internet import defer, task
+class FingerProtocol(protocol.Protocol):
+    pass
+
+
+class FingerFactory(protocol.ServerFactory):
+    protocol = FingerProtocol
 
 
 async def main(reactor):
-    await defer.Deferred()
+    fingerEndpoint = endpoints.serverFromString(reactor, "tcp:1079")
+    fingerEndpoint.listen(FingerFactory())
+    # la siguiente instrucción no es una forma de arrancar el reactor
+    # simplemente regresa un deferred para que no se acabe el bucle
+    await defer.Deferred() 
+    
 
 
-task.react(lambda *a: defer.ensureDeferred(main(*a)), sys.argv[1:])
-                  
+# no es necesario esta línea tan larga sólo es para que veas donde se ponen los argumentos
+# por línea de comando, pero la dejo para futuras referencias
+# task.react(lambda *a: defer.ensureDeferred(main(*a)), sys.argv[1:])
+
+task.react(lambda reactor: defer.ensureDeferred(main(reactor))) # este es el que provee y arranca el reactor
