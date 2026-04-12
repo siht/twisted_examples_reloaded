@@ -18,13 +18,16 @@ class FingerFactory(protocol.ServerFactory):
     # inicia el protocolo y maneja persistencia
     protocol = FingerProtocol
 
+    def __init__(self, users):
+        self.users = users
+
     def getUser(self, user): # "persistencia" de momento
-        return b"No such user" # regresamos un "error"
+        return self.users.get(user, b"No such user") # ahora si buscamos algo
 
 
 def main(): # no es necesaria esta función, pero se ve más agrupado
     fingerEndpoint = endpoints.serverFromString(reactor, "tcp:1079")
-    fingerEndpoint.listen(FingerFactory())
+    fingerEndpoint.listen(FingerFactory({b"moshez": b"Happy and well"}))
     reactor.run()
 
 

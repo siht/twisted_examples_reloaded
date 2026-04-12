@@ -19,13 +19,16 @@ class FingerFactory(protocol.ServerFactory):
     # inicia el protocolo y maneja persistencia
     protocol = FingerProtocol
 
+    def __init__(self, users):
+        self.users = users
+
     def getUser(self, user): # "persistencia" de momento
-        return b"No such user" # regresamos un "error"
+        return self.users.get(user, b"No such user") # ahora si buscamos algo
 
 
 async def main(reactor):
     fingerEndpoint = endpoints.serverFromString(reactor, "tcp:1079")
-    fingerEndpoint.listen(FingerFactory())
+    fingerEndpoint.listen(FingerFactory({b"moshez": b"Happy and well"}))
     # la siguiente instrucción no es una forma de arrancar el reactor
     # simplemente regresa un deferred para que no se acabe el bucle
     await defer.Deferred() 
