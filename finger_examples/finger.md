@@ -38,4 +38,4 @@ para probar el resultado
 telnet 127.0.0.1 1079
 ```
 
-ahora cambiamos el origen de los datos por lo que te da una web, esta sería una solución, que otra solución tenemos? te muestro en el siguiente commit.
+ahora cambiamos el origen de los datos por lo que te da una web, esta sería una solución, que otra solución tenemos? pues usar código bloqueante y convertirlo en on bloqueante.

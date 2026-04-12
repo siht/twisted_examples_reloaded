@@ -1,29 +1,17 @@
+import requests
 from twisted.internet import (
     defer,
     endpoints,
     protocol,
-    reactor,
     task,
-    utils,
+    threads,
 )
 from twisted.protocols import basic
-from twisted.web import client
 
 
 def getPage(url):
-    agent = client.Agent(reactor)
-    d = agent.request(
-        b'GET',
-        url,
-        client.Headers({'User-Agent': [b'Twisted Finger Server']}),
-        None
-    )
-    
-    def cbResponse(response):
-        return client.readBody(response)
-    
-    d.addCallback(cbResponse)
-    return d
+    response = requests.get(url, timeout=5)
+    return response.text.encode('utf-8')
 
 
 class FingerProtocol(basic.LineReceiver):
@@ -49,7 +37,7 @@ class FingerFactory(protocol.ServerFactory):
         self.sufix = sufix
 
     def getUser(self, user):
-        return getPage(b'https://'+user+self.sufix)
+        return threads.deferToThread(getPage, b'https://'+user+self.sufix)
 
 
 async def main(reactor):
