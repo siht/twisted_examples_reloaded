@@ -7,6 +7,22 @@ from twisted.protocols import basic
 from twisted.web import client
 
 
+def getPage(url):
+    agent = client.Agent(reactor)
+    d = agent.request(
+        b'GET',
+        url,
+        client.Headers({'User-Agent': [b'Twisted Finger Server']}),
+        None
+    )
+    
+    def cbResponse(response):
+        return client.readBody(response)
+    
+    d.addCallback(cbResponse)
+    return d
+
+
 class FingerProtocol(basic.LineReceiver):
     def lineReceived(self, user):
         d = self.factory.getUser(user) # obtenermos un deferred al cual podemos colgarle callbacks
@@ -27,16 +43,16 @@ class FingerFactory(protocol.ServerFactory):
     # inicia el protocolo y maneja persistencia
     protocol = FingerProtocol
 
-    def __init__(self, prefix):
-        self.prefix = prefix
+    def __init__(self, sufix):
+        self.sufix = sufix
 
     def getUser(self, user):
-        return client.getPage(self.prefix + user) # oh no. twisted ya no tiene esto :c
+        return getPage(b'https://'+user+self.sufix)
 
 
 def main(): # no es necesaria esta función, pero se ve más agrupado
     fingerEndpoint = endpoints.serverFromString(reactor, "tcp:1079")
-    fingerEndpoint.listen(FingerFactory(prefix=b"http://livejournal.com/~")) # y encima esta url ya no existe
+    fingerEndpoint.listen(FingerFactory(sufix=b".livejournal.com/")) # nueva url, aunque es https ahora
     reactor.run()
 
 
