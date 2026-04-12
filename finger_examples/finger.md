@@ -38,4 +38,4 @@ para probar el resultado
 telnet 127.0.0.1 1079
 ```
 
-se conectará al servidor ... y se desconctará inmediatamente ... sólo es un ejemplo de que si realmente hace algo, además de que muestra a bajo nivel la comunicación con transport, hey protocolos más avanzados que no escriben directamente sobre ese atributo y lo hacen con métodos.
+se conectará al servidor, te dará un prompt para que escribas algo y... se desconctará inmediatamente ... en este momento estamos usando u protocolo más avanzado que pide que escribas algo

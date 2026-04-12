@@ -3,11 +3,12 @@ from twisted.internet import (
     protocol,
     reactor,
 )
+from twisted.protocols import basic
 
 
-class FingerProtocol(protocol.Protocol):
-    def connectionMade(self): # reescribimos el método para que haga algo
-        self.transport.loseConnection() # como... desconectarse...
+class FingerProtocol(basic.LineReceiver):
+    def lineReceived(self, user): # ahora espera un parámetro
+        self.transport.loseConnection() # y se sigue desconectando
 
 
 class FingerFactory(protocol.ServerFactory):
