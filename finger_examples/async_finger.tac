@@ -265,12 +265,29 @@ class FingerService(service.Service):
         return defer.succeed(list(self.users.keys()))
 
 
+@implementer(IFingerService, IFingerSetterService)
+class MemoryFingerService(service.Service):
+    def __init__(self, users):
+        self.users = users
+
+    def getUser(self, user):
+        user = user if isinstance(user, bytes) else user.encode('ascii')
+        return defer.succeed(self.users.get(user, b"No such user"))
+
+    def getUsers(self):
+        return defer.succeed(list(self.users.keys()))
+
+    def setUser(self, user, status):
+        self.users[user] = status
+
+
 def main(): # quitamos la construcción de los factories aquí y los centralizamos en un service
     global application
     application = service.Application("finger", uid=1, gid=1)
     serviceCollection = service.IServiceCollection(application) # ves es el multiservice
 
-    f = FingerService("/etc/users")
+    # f = FingerService("/etc/users")
+    f = MemoryFingerService({b"moshez": b"Happy and well"})
     finger = strports.service("tcp:79", IFingerFactory(f)) # no te confundas esto es un servicio como el de arriba
     # solo que está envolviendo a nuestro factory, es un StreamServerEndpointService
     webfinger = strports.service("tcp:8000", server.Site(resource.IResource(f))) # no lo se pero supongo que Site
@@ -288,6 +305,9 @@ def main(): # quitamos la construcción de los factories aquí y los centralizam
     f.setServiceParent(serviceCollection)
     webfinger.setServiceParent(serviceCollection)
     ircfinger.setServiceParent(serviceCollection)
+    strports.service(
+        "tcp:1079:interface=127.0.0.1", IFingerSetterFactory(f)
+    ).setServiceParent(serviceCollection)
 
 
 if __name__ == 'builtins': # cuando twistd llama a un tac el archivo se llama "builtins"
