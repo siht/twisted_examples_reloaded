@@ -13,28 +13,19 @@ from twisted.protocols import basic
 
 
 class FingerProtocol(basic.LineReceiver):
-    def lineReceived(self, user): # twisted inició con las marcas sincronas de python
-        defer.ensureDeferred(self.handle_line(user)) # sólo tenemos que "marcar" que estamos recibiendo un deferred
+    def lineReceived(self, user):
+        d = self.factory.getUser(user) # obtenermos un deferred al cual podemos colgarle callbacks
 
-    async def handle_line(self, user): # marcamos async para usar await dentro del método
-        try:
-            # Get the result from the factory
-            result = await self.factory.getUser(user)
-            self.transport.write(result + b"\r\n")
-        except Exception:
-            self.transport.write(b"Internal error in server\r\n")
-        finally:
+        def onError(err): # esto es una función callback, no tiene self, incluso podría estar fuera de este scope
+            return "Internal error in server"
+
+        d.addErrback(onError) # agregamos el error calback
+
+        def writeResponse(message): # esto es una función callback, no tiene self, incluso podría estar fuera de este scope
+            self.transport.write(message + b"\r\n")
             self.transport.loseConnection()
 
-
-class FingerFactory(protocol.ServerFactory):
-    protocol = FingerProtocol
-
-    def __init__(self, users):
-        self.users = users
-
-    def getUser(self, user):
-        return defer.succeed(self.users.get(user, b"No such user"))
+        d.addCallback(writeResponse) # agregamos el callback de caso exitoso
 
 
 class FingerSetterProtocol(basic.LineReceiver):
@@ -50,26 +41,39 @@ class FingerSetterProtocol(basic.LineReceiver):
         self.factory.setUser(user, status)
 
 
-class FingerSetterFactory(protocol.ServerFactory):
-    protocol = FingerSetterProtocol
+class FingerService(service.Service):
+    def __init__(self, users):
+        self.users = users
 
-    def __init__(self, fingerFactory):
-        self.fingerFactory = fingerFactory
+    def getUser(self, user):
+        return defer.succeed(self.users.get(user, b"No such user"))
 
     def setUser(self, user, status):
-        self.fingerFactory.users[user] = status
+        self.users[user] = status
+
+    def getFingerFactory(self): # centralizamos la construccion de los factories
+        f = protocol.ServerFactory()
+        f.protocol = FingerProtocol
+        f.getUser = self.getUser
+        return f
+
+    def getFingerSetterFactory(self): # centralizamos la construccion de los factories
+        f = protocol.ServerFactory()
+        f.protocol = FingerSetterProtocol
+        f.setUser = self.setUser
+        return f
 
 
-def main(): # que no los tac tienen Multiservice?
+def main(): # quitamos la construcción de los factories aquí y los centralizamos en un service
     global application
     application = service.Application("finger", uid=1, gid=1)
     serviceCollection = service.IServiceCollection(application) # ves es el multiservice
 
-    ff = FingerFactory({b"moshez": b"Happy and well"})
-    fsf = FingerSetterFactory(ff)
+    f = FingerService({b"moshez": b"Happy and well"})
 
-    strports.service("tcp:79", ff, reactor=reactor).setServiceParent(serviceCollection)
-    strports.service("tcp:1079", fsf).setServiceParent(serviceCollection)
+    # centralizado el factory ahora tenemos más limpieza
+    strports.service("tcp:79", f.getFingerFactory(), reactor=reactor).setServiceParent(serviceCollection)
+    strports.service("tcp:1079", f.getFingerSetterFactory()).setServiceParent(serviceCollection)
 
 
 if __name__ == 'builtins': # cuando twistd llama a un tac el archivo se llama "builtins"

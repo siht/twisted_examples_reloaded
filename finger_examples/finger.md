@@ -47,4 +47,4 @@ telnet 127.0.0.1 79 # para ver los usuarios
 telnet 127.0.0.1 1079 # para insertar nuevos usuarios
 ```
 
-ahora pusimos un nuevo protocolo para ingresar usuarios, además de que ahora se ve explicitamente lo del multiservice
+ahora colocamos un service que nos permite centralizar la creación de los factories, para una mejor separación de código, aunque hay mejores maneras
