@@ -1,7 +1,4 @@
 import email.policy # no tengo idea de porque el xmlrpc falla sin esto, cuando lo corro como un tac
-import html
-import os
-import pwd
 
 from twisted.application import (
     internet,
@@ -13,7 +10,6 @@ from twisted.internet import (
     endpoints,
     protocol,
     reactor,
-    utils,
 )
 from twisted.protocols import basic
 from twisted.python import components
@@ -36,13 +32,6 @@ class IFingerService(Interface):
     def getUsers():
         """
         Return a deferred returning a L{list} of L{bytes}.
-        """
-
-
-class IFingerSetterService(Interface):
-    def setUser(user, status):
-        """
-        Set the user's status to something.
         """
 
 
@@ -85,46 +74,6 @@ class FingerFactoryFromService(protocol.ServerFactory):
 
 
 components.registerAdapter(FingerFactoryFromService, IFingerService, IFingerFactory)
-
-
-class FingerSetterProtocol(basic.LineReceiver):
-    def connectionMade(self):
-        self.lines = []
-
-    def lineReceived(self, line):
-        self.lines.append(line)
-
-    def connectionLost(self, reason):
-        if len(self.lines) == 2:
-            self.factory.setUser(*self.lines)
-
-
-class IFingerSetterFactory(Interface):
-    def setUser(user, status):
-        """
-        Return a deferred returning L{bytes}.
-        """
-
-    def buildProtocol(addr):
-        """
-        Return a protocol returning L{bytes}.
-        """
-
-
-@implementer(IFingerSetterFactory)
-class FingerSetterFactoryFromService(protocol.ServerFactory):
-    protocol = FingerSetterProtocol
-
-    def __init__(self, service):
-        self.service = service
-
-    def setUser(self, user, status):
-        self.service.setUser(user, status)
-
-
-components.registerAdapter(
-    FingerSetterFactoryFromService, IFingerSetterService, IFingerSetterFactory
-)
 
 
 class IRCReplyBot(irc.IRCClient):
@@ -184,6 +133,7 @@ class UserStatusTree(resource.Resource):
     def __init__(self, service):
         resource.Resource.__init__(self)
         self.service = service
+        self.putChild(b"RPC2", UserStatusXR(self.service))
 
     def render_GET(self, request):
         defer.ensureDeferred(self.handle_render_GET(request))
@@ -191,16 +141,23 @@ class UserStatusTree(resource.Resource):
 
     async def handle_render_GET(self, request):
         users = await self.service.getUsers()
-        l = [f'<li><a href="{user.decode('ascii')}">{user.decode('ascii')}</a></li>' for user in users]
-        links  = ("<ul>" + "".join(l) + "</ul>").encode('ascii')
-        request.write(links)
+        userOutput = "".join(
+            [f'<li><a href="{user.decode('ascii')}">{user.decode('ascii')}</a></li>' for user in users]
+        )
+        request.write(
+            ("""
+            <html><head><title>Users</title></head><body>
+            <h1>Users</h1>
+            <ul>
+            %s
+            </ul></body></html>"""
+            % userOutput).encode('ascii')
+        )
         request.finish()
 
     def getChild(self, path, request):
         if path == b"":
             return UserStatusTree(self.service)
-        elif path == b"RPC2":
-            return UserStatusXR(self.service)
         else:
             return UserStatus(path, self.service)
 
@@ -219,11 +176,14 @@ class UserStatus(resource.Resource):
         return server.NOT_DONE_YET
 
     async def handle_render_GET(self, request):
-        finger_response = await self.service.getUser(self.user)
-        finger_response = finger_response.decode('ascii')
-        finger_response = html.escape(finger_response).encode('ascii')
-        template = b"<h1>%b</h1>" % self.user + b"<p>%b</p>" % finger_response
-        request.write(template)
+        status = await self.service.getUser(self.user)
+        request.write(
+            b"""<html><head><title>%s</title></head>
+            <body><h1>%s</h1>
+            <p>%s</p>
+            </body></html>"""
+                % (self.user, self.user, status)
+        )
         request.finish()
 
 
@@ -268,62 +228,12 @@ class FingerService(service.Service):
         return defer.succeed(list(self.users.keys()))
 
 
-@implementer(IFingerService, IFingerSetterService)
-class MemoryFingerService(service.Service):
-    def __init__(self, users):
-        self.users = users
-
-    def getUser(self, user):
-        user = user if isinstance(user, bytes) else user.encode('ascii')
-        return defer.succeed(self.users.get(user, b"No such user"))
-
-    def getUsers(self):
-        return defer.succeed(list(self.users.keys()))
-
-    def setUser(self, user, status):
-        self.users[user] = status
-
-
-@implementer(IFingerService)
-class LocalFingerService(service.Service):
-    def getUser(self, user):
-        # need a local finger daemon running for this to work
-        return utils.getProcessOutput("finger", [user])
-
-    def getUsers(self):
-        return defer.succeed([])
-
-
-@implementer(IFingerService)
-class FullLocalFingerService(service.Service):
-    def getUser(self, user):
-        user = user.strip()
-        try:
-            entry = pwd.getpwnam(user)
-        except KeyError:
-            return defer.succeed("No such user")
-        try:
-            f = open(os.path.join(entry[5], ".plan"))
-        except OSError:
-            return defer.succeed("No such user")
-        with f:
-            data = f.read()
-        data = data.strip()
-        return defer.succeed(data)
-
-    def getUsers(self):
-        return defer.succeed([])
-
-
 def main(): # quitamos la construcción de los factories aquí y los centralizamos en un service
     global application
     application = service.Application("finger", uid=1, gid=1)
     serviceCollection = service.IServiceCollection(application) # ves es el multiservice
 
-    # f = FingerService("/etc/users")
-    # f = MemoryFingerService({b"moshez": b"Happy and well"})
-    # f = LocalFingerService()
-    f = FullLocalFingerService()
+    f = FingerService("/etc/users")
     finger = strports.service("tcp:79", IFingerFactory(f)) # no te confundas esto es un servicio como el de arriba
     # solo que está envolviendo a nuestro factory, es un StreamServerEndpointService
     webfinger = strports.service("tcp:8000", server.Site(resource.IResource(f))) # no lo se pero supongo que Site
@@ -341,9 +251,6 @@ def main(): # quitamos la construcción de los factories aquí y los centralizam
     f.setServiceParent(serviceCollection)
     webfinger.setServiceParent(serviceCollection)
     ircfinger.setServiceParent(serviceCollection)
-    # strports.service(
-    #     "tcp:1079:interface=127.0.0.1", IFingerSetterFactory(f)
-    # ).setServiceParent(serviceCollection)
 
 
 if __name__ == 'builtins': # cuando twistd llama a un tac el archivo se llama "builtins"

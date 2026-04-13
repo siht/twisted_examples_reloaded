@@ -56,7 +56,7 @@ y para probar el servicio SOAP
 python fingerXRclient.py
 ```
 
-seguimos con la inversión de control al cambiar inmediatamente de "backend" uno que no funciona, luego lo reviso, pero la idea es que se puede quitar y poner cosas con la IoC e interfaces casi por arte de magia, de hecho este diseño de componentes se parece mucho a la arquitectura hexagonal, twisted haciendo magia desde tiempos inmemoriables
+esta vez sólo quitamos servivios e interfaces que ya no vamos a usar y mejoramos un poco los recursos web
 
 para los introvertidos que no saben usar el irc acá les dejo una forma de probarlo, yo me instalé uno con docker para probar porque no se como es la comunidad irc [ngircd](https://hub.docker.com/r/linuxserver/ngircd), y de cliente tengo [kvirc](https://www.kvirc.net/) pero la version de portableapps, pero igual son buenas
 
