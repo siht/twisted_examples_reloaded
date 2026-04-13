@@ -63,8 +63,17 @@ y para probar el servicio con Perspective broker
 python fingerPBclient.py
 ```
 
+ya que nuestro servicio de finger es un servidor, podemos hacer un proxy de el, hay que correr primero nuestro servidor primero y despues correr el finger proxy
 
-añadimos un nuevo endpoint pero es de web seguro, segurate de crear tus certificados o usa los mios (la palabra másgica es: phrase), el sentido de este commit es que veas que ya añadir cosas con la estructura correcta lo hace plugable, si escribe un poco más pero la ventaja es el desacoplamiento.
+```shell
+sudo twistd --pidfile proxy.pid -ny fingerproxy.py
+```
+
+y para probar ese nuevo servicio
+
+```shell
+telnet 127.0.0.1 7779 # para ver los usuarios
+```
 
 para los introvertidos que no saben usar el irc acá les dejo una forma de probarlo, yo me instalé uno con docker para probar porque no se como es la comunidad irc [ngircd](https://hub.docker.com/r/linuxserver/ngircd), y de cliente tengo [kvirc](https://www.kvirc.net/) pero la version de portableapps, pero igual son buenas
 
