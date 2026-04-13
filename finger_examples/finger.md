@@ -46,10 +46,11 @@ para probar el resultado
 telnet 127.0.0.1 79 # para ver los usuarios
 ```
 
-y en un navegador entrar a localhost:8000/<usuario>, 
+y en un navegador entrar a localhost:8000/<usuario>
+
+y en el irc mandale un mensaje privado a fingerbot ```/msg fingerbot usuario```
 
 
-
-ahora le agregamos un recurso html, por el puerto 8000
+ahora agregamos un bot irc realativamente fácil, yo me instalé uno con docker para probar porque no se como es la comunidad irc [ngircd](https://hub.docker.com/r/linuxserver/ngircd), y de cliente tengo [kvirc](https://www.kvirc.net/) pero la version de portableapps, pero igual son buenas
 
 cabe notar que ese archivo lo tengo en el archivo /etc/users (texto plano) con un formato "usuario:mensaje" separadao por saltos de línea

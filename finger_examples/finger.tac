@@ -1,11 +1,11 @@
-import html
-
 from twisted.application import (
+    internet,
     service,
     strports,
 )
 from twisted.internet import (
     defer,
+    endpoints,
     protocol,
     reactor,
 )
@@ -15,6 +15,7 @@ from twisted.web import (
     server,
     static,
 )
+from twisted.words.protocols import irc
 
 
 class FingerProtocol(basic.LineReceiver):
@@ -33,30 +34,26 @@ class FingerProtocol(basic.LineReceiver):
         d.addCallback(writeResponse) # agregamos el callback de caso exitoso
 
 
-class FingerResource(resource.Resource):
-    def __init__(self, users):
-        self.users = users
-        resource.Resource.__init__(self)
+class IRCReplyBot(irc.IRCClient):
+    def connectionMade(self):
+        self.nickname = self.factory.nickname
+        irc.IRCClient.connectionMade(self)
 
-    # we treat the path as the username
-    def getChild(self, username, request):
-        """
-        'username' is L{bytes}.
-        'request' is a 'twisted.web.server.Request'.
-        """
-        messagevalue = self.users.get(username)
-        if messagevalue:
-            messagevalue = messagevalue.decode("ascii")
-        if type(username) == bytes:
-            username = username.decode("ascii")
-        username = html.escape(username)
-        if messagevalue is not None:
-            messagevalue = html.escape(messagevalue)
-            text = f"<h1>{username}</h1><p>{messagevalue}</p>"
-        else:
-            text = f"<h1>{username}</h1><p>No such user</p>"
-        text = text.encode("ascii")
-        return static.Data(text, "text/html")
+    def privmsg(self, user, channel, msg):
+        user = user.split("!")[0]
+        if self.nickname.lower() == channel.lower():
+            d = self.factory.getUser(msg.encode("ascii"))
+
+            def onError(err):
+                return b"Internal error in server"
+
+            d.addErrback(onError)
+
+            def writeResponse(message):
+                message = message.decode("ascii")
+                irc.IRCClient.msg(self, user, msg + ": " + message)
+
+            d.addCallback(writeResponse)
 
 
 class FingerService(service.Service):
@@ -91,8 +88,24 @@ class FingerService(service.Service):
         return f
 
     def getResource(self):
-        r = FingerResource(self.users)
+        def getData(path, request):
+            user = self.users.get(path, b"No such users <p/> usage: site/user")
+            path = path.decode("ascii")
+            user = user.decode("ascii")
+            text = f"<h1>{path}</h1><p>{user}</p>"
+            text = text.encode("ascii")
+            return static.Data(text, "text/html")
+
+        r = resource.Resource()
+        r.getChild = getData
         return r
+
+    def getIRCBot(self, nickname):
+        f = protocol.ClientFactory()
+        f.protocol = IRCReplyBot
+        f.nickname = nickname
+        f.getUser = self.getUser
+        return f
 
 
 def main(): # quitamos la construcción de los factories aquí y los centralizamos en un service
@@ -105,10 +118,17 @@ def main(): # quitamos la construcción de los factories aquí y los centralizam
     # solo que está envolviendo a nuestro factory, es un StreamServerEndpointService
     webfinger = strports.service("tcp:8000", server.Site(f.getResource())) # no lo se pero supongo que Site
     # es un tipo de servicio que acepta resources para mostrar
+    ircfinger = internet.ClientService( # antiguo freenode o liberachat
+        #endpoints.clientFromString(reactor, "tcp:irc.freenode.org:6667"), 
+        #endpoints.clientFromString(reactor, "tcp:irc.liberachat.chat:6667"), 
+        endpoints.clientFromString(reactor, "tcp:127.0.0.1:6667"), # yo mejor me instalo mi propio server de irc para no molestar
+        f.getIRCBot("fingerbot"), # asegurate de que el nombre de tu bot no sea muy largo a veces da error y no te notifica
+    )
 
     finger.setServiceParent(serviceCollection)
     f.setServiceParent(serviceCollection)
     webfinger.setServiceParent(serviceCollection)
+    ircfinger.setServiceParent(serviceCollection)
 
 
 if __name__ == 'builtins': # cuando twistd llama a un tac el archivo se llama "builtins"
