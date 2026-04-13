@@ -56,9 +56,9 @@ y para probar el servicio SOAP
 python fingerXRclient.py
 ```
 
-ahora agregamos un servicio "soap" o xmlrpc, y dejo lo que escribí del irc, porque luego es engañoso para el novato o para el que no lo usa seguido.
+no hemos cambiado la funcionalidad, pero si el orden del código separando intereses
 
-ahora agregamos un bot irc realativamente fácil, yo me instalé uno con docker para probar porque no se como es la comunidad irc [ngircd](https://hub.docker.com/r/linuxserver/ngircd), y de cliente tengo [kvirc](https://www.kvirc.net/) pero la version de portableapps, pero igual son buenas
+para los introvertidos que no saben usar el irc acá les dejo una forma de probarlo, yo me instalé uno con docker para probar porque no se como es la comunidad irc [ngircd](https://hub.docker.com/r/linuxserver/ngircd), y de cliente tengo [kvirc](https://www.kvirc.net/) pero la version de portableapps, pero igual son buenas
 
 
 cabe notar que ese archivo lo tengo en el archivo /etc/users (texto plano) con un formato "usuario:mensaje" separadao por saltos de línea

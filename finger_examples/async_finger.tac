@@ -1,4 +1,5 @@
 import email.policy # no tengo idea de porque el xmlrpc falla sin esto, cuando lo corro como un tac
+import html
 
 from twisted.application import (
     internet,
@@ -15,7 +16,6 @@ from twisted.protocols import basic
 from twisted.web import (
     resource,
     server,
-    static,
     xmlrpc,
 )
 from twisted.words.protocols import irc
@@ -50,9 +50,60 @@ class IRCReplyBot(irc.IRCClient):
             inner_user = await self.factory.getUser(msg.encode("ascii"))
             try:
                 message = inner_user.decode("ascii")
-                irc.IRCClient.msg(self, user, msg + ": " + message)
+                self.msg(user, f"Status of {msg}: {message}")
             except Exception as err:
-                irc.IRCClient.msg(self, b"Internal error in server")
+                self.msg(b"Internal error in server")
+
+
+class UserStatusTree(resource.Resource):
+    def __init__(self, service):
+        resource.Resource.__init__(self)
+        self.service = service
+
+    def render_GET(self, request):
+        defer.ensureDeferred(self.handle_render_GET(request))
+        return server.NOT_DONE_YET
+
+    async def handle_render_GET(self, request):
+        users = await self.service.getUsers()
+        l = [f'<li><a href="{user.decode('ascii')}">{user.decode('ascii')}</a></li>' for user in users]
+        links  = ("<ul>" + "".join(l) + "</ul>").encode('ascii')
+        request.write(links)
+        request.finish()
+
+    def getChild(self, path, request):
+        if path == b"":
+            return UserStatusTree(self.service)
+        else:
+            return UserStatus(path, self.service)
+
+
+class UserStatus(resource.Resource):
+    def __init__(self, user, service):
+        resource.Resource.__init__(self)
+        self.user = user
+        self.service = service
+
+    def render_GET(self, request):
+        defer.ensureDeferred(self.handle_render_GET(request))
+        return server.NOT_DONE_YET
+
+    async def handle_render_GET(self, request):
+        finger_response = await self.service.getUser(self.user)
+        finger_response = finger_response.decode('ascii')
+        finger_response = html.escape(finger_response).encode('ascii')
+        template = b"<h1>%b</h1>" % self.user + b"<p>%b</p>" % finger_response
+        request.write(template)
+        request.finish()
+
+
+class UserStatusXR(xmlrpc.XMLRPC):
+    def __init__(self, service):
+        xmlrpc.XMLRPC.__init__(self)
+        self.service = service
+
+    def xmlrpc_getUser(self, user):
+        return self.service.getUser(user)
 
 
 class FingerService(service.Service):
@@ -82,6 +133,9 @@ class FingerService(service.Service):
             user = user.encode("ascii")
         return defer.succeed(self.users.get(user, b"No such user"))
 
+    def getUsers(self):
+        return defer.succeed(list(self.users.keys()))
+
     def getFingerFactory(self):
         f = protocol.ServerFactory()
         f.protocol = FingerProtocol
@@ -89,18 +143,8 @@ class FingerService(service.Service):
         return f
 
     def getResource(self):
-        def getData(path, request):
-            user = self.users.get(path, b"No such users <p/> usage: site/user")
-            path = path.decode("ascii")
-            user = user.decode("ascii")
-            text = f"<h1>{path}</h1><p>{user}</p>"
-            text = text.encode("ascii")
-            return static.Data(text, "text/html")
-
-        r = resource.Resource()
-        r.getChild = getData
-        x = xmlrpc.XMLRPC()
-        x.xmlrpc_getUser = self.getUser
+        r = UserStatusTree(self)
+        x = UserStatusXR(self)
         r.putChild(b"RPC2", x)
         return r
 

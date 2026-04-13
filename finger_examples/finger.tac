@@ -1,4 +1,5 @@
 import email.policy # no tengo idea de porque el xmlrpc falla sin esto, cuando lo corro como un tac
+import html
 
 from twisted.application import (
     internet,
@@ -15,20 +16,19 @@ from twisted.protocols import basic
 from twisted.web import (
     resource,
     server,
-    static,
     xmlrpc,
 )
 from twisted.words.protocols import irc
 
 
+def catchError(err):
+    return "Internal error in server"
+
+
 class FingerProtocol(basic.LineReceiver):
     def lineReceived(self, user):
         d = self.factory.getUser(user) # obtenermos un deferred al cual podemos colgarle callbacks
-
-        def onError(err): # esto es una función callback, no tiene self, incluso podría estar fuera de este scope
-            return "Internal error in server"
-
-        d.addErrback(onError) # agregamos el error calback
+        d.addErrback(catchError) # agregamos el error calback
 
         def writeResponse(message): # esto es una función callback, no tiene self, incluso podría estar fuera de este scope
             self.transport.write(message + b"\r\n")
@@ -46,17 +46,59 @@ class IRCReplyBot(irc.IRCClient):
         user = user.split("!")[0]
         if self.nickname.lower() == channel.lower():
             d = self.factory.getUser(msg.encode("ascii"))
+            d.addErrback(catchError)
+            d.addCallback(lambda m: f"Status of {msg}: {m}")
+            d.addCallback(lambda m: self.msg(user, m))
 
-            def onError(err):
-                return b"Internal error in server"
 
-            d.addErrback(onError)
+class UserStatusTree(resource.Resource):
+    def __init__(self, service):
+        resource.Resource.__init__(self)
+        self.service = service
 
-            def writeResponse(message):
-                message = message.decode("ascii")
-                irc.IRCClient.msg(self, user, msg + ": " + message)
+    def render_GET(self, request):
+        d = self.service.getUsers()
 
-            d.addCallback(writeResponse)
+        def formatUsers(users):
+            l = [f'<li><a href="{user.decode('ascii')}">{user.decode('ascii')}</a></li>' for user in users]
+            return ("<ul>" + "".join(l) + "</ul>").encode('ascii')
+
+        d.addCallback(formatUsers)
+        d.addCallback(request.write)
+        d.addCallback(lambda _: request.finish())
+        return server.NOT_DONE_YET
+
+    def getChild(self, path, request):
+        if path == b"":
+            return UserStatusTree(self.service)
+        else:
+            return UserStatus(path, self.service)
+
+
+class UserStatus(resource.Resource):
+    def __init__(self, user, service):
+        resource.Resource.__init__(self)
+        self.user = user
+        self.service = service
+
+    def render_GET(self, request):
+        d = self.service.getUser(self.user)
+        d.addCallback(lambda x: x.decode('ascii'))
+        d.addCallback(html.escape)
+        d.addCallback(lambda x: x.encode('ascii'))
+        d.addCallback(lambda m: b"<h1>%b</h1>" % self.user + b"<p>%b</p>" % m)
+        d.addCallback(request.write)
+        d.addCallback(lambda _: request.finish())
+        return server.NOT_DONE_YET
+
+
+class UserStatusXR(xmlrpc.XMLRPC):
+    def __init__(self, service):
+        xmlrpc.XMLRPC.__init__(self)
+        self.service = service
+
+    def xmlrpc_getUser(self, user):
+        return self.service.getUser(user)
 
 
 class FingerService(service.Service):
@@ -86,6 +128,9 @@ class FingerService(service.Service):
             user = user.encode("ascii")
         return defer.succeed(self.users.get(user, b"No such user"))
 
+    def getUsers(self):
+        return defer.succeed(list(self.users.keys()))
+
     def getFingerFactory(self):
         f = protocol.ServerFactory()
         f.protocol = FingerProtocol
@@ -93,18 +138,8 @@ class FingerService(service.Service):
         return f
 
     def getResource(self):
-        def getData(path, request):
-            user = self.users.get(path, b"No such users <p/> usage: site/user")
-            path = path.decode("ascii")
-            user = user.decode("ascii")
-            text = f"<h1>{path}</h1><p>{user}</p>"
-            text = text.encode("ascii")
-            return static.Data(text, "text/html")
-
-        r = resource.Resource()
-        r.getChild = getData
-        x = xmlrpc.XMLRPC()
-        x.xmlrpc_getUser = self.getUser
+        r = UserStatusTree(self)
+        x = UserStatusXR(self)
         r.putChild(b"RPC2", x)
         return r
 
