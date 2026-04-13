@@ -1,13 +1,8 @@
 import email.policy # no tengo idea de porque el xmlrpc falla sin esto, cuando lo corro como un tac
 
-from twisted.application import (
-    internet,
-    service,
-    strports,
-)
+from twisted.application import service
 from twisted.internet import (
     defer,
-    endpoints,
     protocol,
     reactor,
 )
@@ -254,40 +249,3 @@ class FingerService(service.Service):
 
     def getUsers(self):
         return defer.succeed(list(self.users.keys()))
-
-
-
-def main(): # quitamos la construcción de los factories aquí y los centralizamos en un service
-    global application
-    application = service.Application("finger", uid=1, gid=1)
-    serviceCollection = service.IServiceCollection(application) # ves es el multiservice
-
-    f = FingerService("/etc/users")
-    finger = strports.service("tcp:79", IFingerFactory(f)) # no te confundas esto es un servicio como el de arriba
-    # solo que está envolviendo a nuestro factory, es un StreamServerEndpointService
-    site = server.Site(resource.IResource(f))
-    webfinger = strports.service("tcp:8000", site) # no lo se pero supongo que Site
-    # es un tipo de servicio que acepta resources para mostrar
-    i = IIRCClientFactory(f)
-    i.nickname = "fingerbot" # asegurate de que el nombre de tu bot no sea muy largo a veces da error y no te notifica
-    ircfinger = internet.ClientService( # antiguo freenode o liberachat
-        #endpoints.clientFromString(reactor, "tcp:irc.freenode.org:6667"), 
-        #endpoints.clientFromString(reactor, "tcp:irc.liberachat.chat:6667"), 
-        endpoints.clientFromString(reactor, "tcp:127.0.0.1:6667"), # yo mejor me instalo mi propio server de irc para no molestar
-        i
-    )
-
-    finger.setServiceParent(serviceCollection)
-    f.setServiceParent(serviceCollection)
-    webfinger.setServiceParent(serviceCollection)
-    ircfinger.setServiceParent(serviceCollection)
-    strports.service(
-        "tcp:8889", pb.PBServerFactory(IPerspectiveFinger(f))
-    ).setServiceParent(serviceCollection)
-    strports.service(
-        "ssl:port=443:certKey=cert.pem:privateKey=key.pem", site
-    ).setServiceParent(serviceCollection)
-
-
-if __name__ == 'builtins': # cuando twistd llama a un tac el archivo se llama "builtins"
-    main()

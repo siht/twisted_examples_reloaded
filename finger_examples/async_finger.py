@@ -1,13 +1,8 @@
 import email.policy # no tengo idea de porque el xmlrpc falla sin esto, cuando lo corro como un tac
 
-from twisted.application import (
-    internet,
-    service,
-    strports,
-)
+from twisted.application import service
 from twisted.internet import (
     defer,
-    endpoints,
     protocol,
     reactor,
 )
@@ -36,19 +31,20 @@ class IFingerService(Interface):
         """
 
 
-class FingerProtocol(basic.LineReceiver):
-    def lineReceived(self, user): # twisted inició con las marcas sincronas de python
-        defer.ensureDeferred(self.handle_line(user)) # sólo tenemos que "marcar" que estamos recibiendo un deferred
+def catchError(err):
+    return "Internal error in server"
 
-    async def handle_line(self, user): # marcamos async para usar await dentro del método
-        try:
-            # Get the result from the factory
-            result = await self.factory.getUser(user)
-            self.transport.write(result + b"\r\n")
-        except Exception:
-            self.transport.write(b"Internal error in server\r\n")
-        finally:
+
+class FingerProtocol(basic.LineReceiver):
+    def lineReceived(self, user):
+        d = self.factory.getUser(user) # obtenermos un deferred al cual podemos colgarle callbacks
+        d.addErrback(catchError) # agregamos el error calback
+
+        def writeResponse(message): # esto es una función callback, no tiene self, incluso podría estar fuera de este scope
+            self.transport.write(message + b"\r\n")
             self.transport.loseConnection()
+
+        d.addCallback(writeResponse) # agregamos el callback de caso exitoso
 
 
 class IFingerFactory(Interface):
@@ -83,17 +79,12 @@ class IRCReplyBot(irc.IRCClient):
         irc.IRCClient.connectionMade(self)
 
     def privmsg(self, user, channel, msg):
-        defer.ensureDeferred(self.handle_privmsg(user, channel, msg))
-
-    async def handle_privmsg(self, user, channel, msg):
         user = user.split("!")[0]
         if self.nickname.lower() == channel.lower():
-            inner_user = await self.factory.getUser(msg.encode("ascii"))
-            try:
-                message = inner_user.decode("ascii")
-                self.msg(user, f"Status of {msg}: {message}")
-            except Exception as err:
-                self.msg(user, b"Internal error in server")
+            d = self.factory.getUser(msg.encode("ascii"))
+            d.addErrback(catchError)
+            d.addCallback(lambda m: f"Status of {msg}: {m}")
+            d.addCallback(lambda m: self.msg(user, m))
 
 
 class IIRCClientFactory(Interface):
@@ -136,12 +127,7 @@ class UserStatusTree(resource.Resource):
         self.service = service
         self.putChild(b"RPC2", UserStatusXR(self.service))
 
-    def render_GET(self, request):
-        defer.ensureDeferred(self.handle_render_GET(request))
-        return server.NOT_DONE_YET
-
-    async def handle_render_GET(self, request):
-        users = await self.service.getUsers()
+    def _cb_render_GET(self, users, request):
         userOutput = "".join(
             [f'<li><a href="{user.decode('ascii')}">{user.decode('ascii')}</a></li>' for user in users]
         )
@@ -155,6 +141,13 @@ class UserStatusTree(resource.Resource):
             % userOutput).encode('ascii')
         )
         request.finish()
+
+    def render_GET(self, request):
+        d = self.service.getUsers()
+        d.addCallback(self._cb_render_GET, request)
+
+        # signal that the rendering is not complete
+        return server.NOT_DONE_YET
 
     def getChild(self, path, request):
         if path == b"":
@@ -172,20 +165,21 @@ class UserStatus(resource.Resource):
         self.user = user
         self.service = service
 
-    def render_GET(self, request):
-        defer.ensureDeferred(self.handle_render_GET(request))
-        return server.NOT_DONE_YET
-
-    async def handle_render_GET(self, request):
-        status = await self.service.getUser(self.user)
+    def _cb_render_GET(self, status, request):
         request.write(
             b"""<html><head><title>%s</title></head>
-            <body><h1>%s</h1>
-            <p>%s</p>
-            </body></html>"""
-                % (self.user, self.user, status)
+        <body><h1>%s</h1>
+        <p>%s</p>
+        </body></html>"""
+            % (self.user, self.user, status)
         )
         request.finish()
+
+    def render_GET(self, request):
+        d = self.service.getUser(self.user)
+        d.addCallback(self._cb_render_GET, request)
+        # signal that the rendering is not complete
+        return server.NOT_DONE_YET
 
 
 class UserStatusXR(xmlrpc.XMLRPC):
@@ -194,6 +188,7 @@ class UserStatusXR(xmlrpc.XMLRPC):
         self.service = service
 
     def xmlrpc_getUser(self, user):
+        print(user)
         return self.service.getUser(user)
 
 
@@ -254,39 +249,3 @@ class FingerService(service.Service):
 
     def getUsers(self):
         return defer.succeed(list(self.users.keys()))
-
-
-def main(): # quitamos la construcción de los factories aquí y los centralizamos en un service
-    global application
-    application = service.Application("finger", uid=1, gid=1)
-    serviceCollection = service.IServiceCollection(application) # ves es el multiservice
-
-    f = FingerService("/etc/users")
-    finger = strports.service("tcp:79", IFingerFactory(f)) # no te confundas esto es un servicio como el de arriba
-    # solo que está envolviendo a nuestro factory, es un StreamServerEndpointService
-    site = server.Site(resource.IResource(f))
-    webfinger = strports.service("tcp:8000", site) # no lo se pero supongo que Site
-    # es un tipo de servicio que acepta resources para mostrar
-    i = IIRCClientFactory(f)
-    i.nickname = "fingerbot" # asegurate de que el nombre de tu bot no sea muy largo a veces da error y no te notifica
-    ircfinger = internet.ClientService( # antiguo freenode o liberachat
-        #endpoints.clientFromString(reactor, "tcp:irc.freenode.org:6667"), 
-        #endpoints.clientFromString(reactor, "tcp:irc.liberachat.chat:6667"), 
-        endpoints.clientFromString(reactor, "tcp:127.0.0.1:6667"), # yo mejor me instalo mi propio server de irc para no molestar
-        i
-    )
-
-    finger.setServiceParent(serviceCollection)
-    f.setServiceParent(serviceCollection)
-    webfinger.setServiceParent(serviceCollection)
-    ircfinger.setServiceParent(serviceCollection)
-    strports.service(
-        "tcp:8889", pb.PBServerFactory(IPerspectiveFinger(f))
-    ).setServiceParent(serviceCollection)
-    strports.service(
-        "ssl:port=443:certKey=cert.pem:privateKey=key.pem", site
-    ).setServiceParent(serviceCollection)
-
-
-if __name__ == 'builtins': # cuando twistd llama a un tac el archivo se llama "builtins"
-    main()
