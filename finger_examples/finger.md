@@ -50,7 +50,15 @@ y en un navegador entrar a localhost:8000/<usuario>
 
 y en el irc mandale un mensaje privado a fingerbot ```/msg fingerbot usuario```
 
+y para probar el servicio SOAP
+
+```shell
+python fingerXRclient.py
+```
+
+ahora agregamos un servicio "soap" o xmlrpc, y dejo lo que escribí del irc, porque luego es engañoso para el novato o para el que no lo usa seguido.
 
 ahora agregamos un bot irc realativamente fácil, yo me instalé uno con docker para probar porque no se como es la comunidad irc [ngircd](https://hub.docker.com/r/linuxserver/ngircd), y de cliente tengo [kvirc](https://www.kvirc.net/) pero la version de portableapps, pero igual son buenas
+
 
 cabe notar que ese archivo lo tengo en el archivo /etc/users (texto plano) con un formato "usuario:mensaje" separadao por saltos de línea

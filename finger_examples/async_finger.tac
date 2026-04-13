@@ -1,3 +1,5 @@
+import email.policy # no tengo idea de porque el xmlrpc falla sin esto, cuando lo corro como un tac
+
 from twisted.application import (
     internet,
     service,
@@ -14,6 +16,7 @@ from twisted.web import (
     resource,
     server,
     static,
+    xmlrpc,
 )
 from twisted.words.protocols import irc
 
@@ -75,6 +78,8 @@ class FingerService(service.Service):
         self.call.cancel()
 
     def getUser(self, user):
+        if isinstance(user, str):
+            user = user.encode("ascii")
         return defer.succeed(self.users.get(user, b"No such user"))
 
     def getFingerFactory(self):
@@ -94,6 +99,9 @@ class FingerService(service.Service):
 
         r = resource.Resource()
         r.getChild = getData
+        x = xmlrpc.XMLRPC()
+        x.xmlrpc_getUser = self.getUser
+        r.putChild(b"RPC2", x)
         return r
 
     def getIRCBot(self, nickname):
