@@ -43,7 +43,8 @@ sudo twistd -ny async_finger.py
 para probar el resultado
 
 ```shell
-telnet 127.0.0.1 1079
+telnet 127.0.0.1 79 # para ver los usuarios
+telnet 127.0.0.1 1079 # para insertar nuevos usuarios
 ```
 
-regresamos al mismo origen de datos que era un diccionario pero ahora lo volvemos un .tac, como ves el protocolo prácticamente se mantiene igual, sólo hemos cambiado el factory.
+ahora pusimos un nuevo protocolo para ingresar usuarios, además de que ahora se ve explicitamente lo del multiservice
