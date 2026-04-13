@@ -1,16 +1,16 @@
-import requests
+from twisted.application import (
+    service,
+    strports,
+)
+
 from twisted.internet import (
-    endpoints,
+    defer,
     protocol,
     reactor,
-    threads,
 )
+
 from twisted.protocols import basic
 
-
-def getPage(url):
-    response = requests.get(url, timeout=5)
-    return response.text.encode('utf-8')
 
 
 class FingerProtocol(basic.LineReceiver):
@@ -30,21 +30,23 @@ class FingerProtocol(basic.LineReceiver):
 
 
 class FingerFactory(protocol.ServerFactory):
-    # inicia el protocolo y maneja persistencia
     protocol = FingerProtocol
 
-    def __init__(self, sufix):
-        self.sufix = sufix
+    def __init__(self, users):
+        self.users = users
 
     def getUser(self, user):
-        return threads.deferToThread(getPage, b'https://'+user+self.sufix)
+        return defer.succeed(self.users.get(user, b"No such user"))
 
 
-def main(): # no es necesaria esta función, pero se ve más agrupado
-    fingerEndpoint = endpoints.serverFromString(reactor, "tcp:1079")
-    fingerEndpoint.listen(FingerFactory(sufix=b".livejournal.com/")) # nueva url, aunque es https ahora
-    reactor.run()
+def main(): # que no los tac tienen Multiservice?
+    global application
+    application = service.Application("finger", uid=1, gid=1)
+    factory = FingerFactory({b"moshez": b"Happy and well"})
+    strports.service("tcp:79", factory, reactor=reactor).setServiceParent(
+        service.IServiceCollection(application) # aquí está el multiservice, pero como es una sola aplicación 
+    )# pues la dejaron sin la referencia para que otros la puedan tomar
 
 
-if __name__ == '__main__':
+if __name__ == 'builtins': # cuando twistd llama a un tac el archivo se llama "builtins"
     main()

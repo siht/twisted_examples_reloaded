@@ -13,22 +13,30 @@ No Plan.
 ```
 ## instrucciones
 
-En este commit vamos a hacer que el reactor haga algo, anteriormente descartaba las conexiones porque no había algo que la gestione, pero ahora pondremos un protocolo, pero para que se pueda usar un protocolo necesitamos una factory, este protocolo hace absolutamente... nada, bueno como mínimo no descarta las conexiones.
+Ahora hemos cambiado un poco la estructura ya que vamos a llamar las aplicaciones con twistd, pero como vamos a usar puertos privilegiados necesitamos permisos de adminitrador.
 
-también fijate que en la versión deferred puse una función main que hace que se vea mas similar a la versión con async/await
+En mi caso usé conda y para encontrar el binario de twistd para poder ejecutar lo usé ```whereis twistd```, ya que si ejecuto:
 
-por cierto en el commit anterior se me olvidó que debías probar el código con un cliente que pueda comunicarse en este caso usaremos telnet, sin embargo como en el anteriro ejemplo no había ningún puerto escuchando tampoco había mucho caso, no habí un punto de entrada pero ahora ya
+```sh
+sudo twistd -ny finger.tac
+```
+
+este no se va a encontrar en el path del root, así que lo más afácil y sencillo para mi es usar la ruta completa que me va a dar whereis o sea:
+
+```sh
+sudo /una/ruta/hiperlarga/donde/estan/los/envs/de/conda/twistd -ny finger.tac
+```
 
 así que para poner nuestros servidores en acción (toma en cuenta que ambos escuchan el mismo puerto así que no es posible poner a funcionar ambos a menos que le cambies a uno el puerto):
 
 ```shell
-python finger.py
+sudo twistd -ny finger.py
 ```
 
 o
 
 ```shell
-python async_finger.py
+sudo twistd -ny async_finger.py
 ```
 
 
@@ -38,4 +46,4 @@ para probar el resultado
 telnet 127.0.0.1 1079
 ```
 
-ahora cambiamos el origen de los datos por lo que te da una web, esta sería una solución, que otra solución tenemos? pues usar código bloqueante y convertirlo en on bloqueante.
+regresamos al mismo origen de datos que era un diccionario pero ahora lo volvemos un .tac, como ves el protocolo prácticamente se mantiene igual, sólo hemos cambiado el factory.
