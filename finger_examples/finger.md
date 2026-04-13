@@ -56,7 +56,15 @@ y para probar el servicio SOAP
 python fingerXRclient.py
 ```
 
-esta vez sólo quitamos servivios e interfaces que ya no vamos a usar y mejoramos un poco los recursos web
+y para probar el servicio con Perspective broker
+
+
+```shell
+python fingerPBclient.py
+```
+
+
+añadimos un nuevo protocolo llamado perspective broker, nada que ver con message broker, es un protocolo similar a SOAP pero más optimizado
 
 para los introvertidos que no saben usar el irc acá les dejo una forma de probarlo, yo me instalé uno con docker para probar porque no se como es la comunidad irc [ngircd](https://hub.docker.com/r/linuxserver/ngircd), y de cliente tengo [kvirc](https://www.kvirc.net/) pero la version de portableapps, pero igual son buenas
 

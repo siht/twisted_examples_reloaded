@@ -13,6 +13,7 @@ from twisted.internet import (
 )
 from twisted.protocols import basic
 from twisted.python import components
+from twisted.spread import pb
 from twisted.web import (
     resource,
     server,
@@ -196,6 +197,33 @@ class UserStatusXR(xmlrpc.XMLRPC):
         return self.service.getUser(user)
 
 
+class IPerspectiveFinger(Interface):
+    def remote_getUser(username):
+        """
+        Return a user's status.
+        """
+
+    def remote_getUsers():
+        """
+        Return a user's status.
+        """
+
+
+@implementer(IPerspectiveFinger)
+class PerspectiveFingerFromService(pb.Root):
+    def __init__(self, service):
+        self.service = service
+
+    def remote_getUser(self, username):
+        return self.service.getUser(username)
+
+    def remote_getUsers(self):
+        return self.service.getUsers()
+
+
+components.registerAdapter(PerspectiveFingerFromService, IFingerService, IPerspectiveFinger)
+
+
 @implementer(IFingerService)
 class FingerService(service.Service):
     def __init__(self, filename):
@@ -252,6 +280,9 @@ def main(): # quitamos la construcción de los factories aquí y los centralizam
     f.setServiceParent(serviceCollection)
     webfinger.setServiceParent(serviceCollection)
     ircfinger.setServiceParent(serviceCollection)
+    strports.service(
+        "tcp:8889", pb.PBServerFactory(IPerspectiveFinger(f))
+    ).setServiceParent(serviceCollection)
 
 
 if __name__ == 'builtins': # cuando twistd llama a un tac el archivo se llama "builtins"
