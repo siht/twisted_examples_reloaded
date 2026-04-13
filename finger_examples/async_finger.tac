@@ -28,39 +28,35 @@ class FingerProtocol(basic.LineReceiver):
         d.addCallback(writeResponse) # agregamos el callback de caso exitoso
 
 
-class FingerSetterProtocol(basic.LineReceiver):
-    def connectionMade(self):
-        self.lines = []
-
-    def lineReceived(self, line):
-        self.lines.append(line)
-
-    def connectionLost(self, reason):
-        user = self.lines[0]
-        status = self.lines[1]
-        self.factory.setUser(user, status)
-
-
 class FingerService(service.Service):
-    def __init__(self, users):
-        self.users = users
+    def __init__(self, filename):
+        self.users = {}
+        self.filename = filename
+
+    def _read(self):
+        with open(self.filename, "rb") as f:
+            for line in f:
+                user, status = line.split(b":", 1)
+                user = user.strip()
+                status = status.strip()
+                self.users[user] = status
+        self.call = reactor.callLater(30, self._read)
+
+    def startService(self):
+        self._read()
+        service.Service.startService(self) # esto es el super() pero la forma antigua
+
+    def stopService(self):
+        service.Service.stopService(self)  # esto es el super() pero la forma antigua
+        self.call.cancel()
 
     def getUser(self, user):
         return defer.succeed(self.users.get(user, b"No such user"))
 
-    def setUser(self, user, status):
-        self.users[user] = status
-
-    def getFingerFactory(self): # centralizamos la construccion de los factories
+    def getFingerFactory(self):
         f = protocol.ServerFactory()
         f.protocol = FingerProtocol
         f.getUser = self.getUser
-        return f
-
-    def getFingerSetterFactory(self): # centralizamos la construccion de los factories
-        f = protocol.ServerFactory()
-        f.protocol = FingerSetterProtocol
-        f.setUser = self.setUser
         return f
 
 
@@ -69,11 +65,12 @@ def main(): # quitamos la construcción de los factories aquí y los centralizam
     application = service.Application("finger", uid=1, gid=1)
     serviceCollection = service.IServiceCollection(application) # ves es el multiservice
 
-    f = FingerService({b"moshez": b"Happy and well"})
+    f = FingerService("/etc/users")
+    finger = strports.service("tcp:79", f.getFingerFactory()) # no te confundas esto es un servicio como el de arriba
+    # solo que está envolviendo a nuestro factory, es un StreamServerEndpointService
 
-    # centralizado el factory ahora tenemos más limpieza
-    strports.service("tcp:79", f.getFingerFactory(), reactor=reactor).setServiceParent(serviceCollection)
-    strports.service("tcp:1079", f.getFingerSetterFactory()).setServiceParent(serviceCollection)
+    finger.setServiceParent(serviceCollection)
+    f.setServiceParent(serviceCollection)
 
 
 if __name__ == 'builtins': # cuando twistd llama a un tac el archivo se llama "builtins"

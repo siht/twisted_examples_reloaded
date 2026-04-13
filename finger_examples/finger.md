@@ -44,7 +44,8 @@ para probar el resultado
 
 ```shell
 telnet 127.0.0.1 79 # para ver los usuarios
-telnet 127.0.0.1 1079 # para insertar nuevos usuarios
 ```
 
-ahora colocamos un service que nos permite centralizar la creación de los factories, para una mejor separación de código, aunque hay mejores maneras
+ahora hacemos un servicio que lea desde un archivo, y como el ejemplo no tiene un ejemplo de como insertar en el archivo nosotros tampoc haremos el intento (bueno, yo no)
+
+cabe notar que ese archivo lo tengo en el archivo /etc/users (texto plano) con un formato "usuario:mensaje" separadao por saltos de línea
