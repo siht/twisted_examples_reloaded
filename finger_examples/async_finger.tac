@@ -11,6 +11,7 @@ from twisted.internet import (
     endpoints,
     protocol,
     reactor,
+    utils,
 )
 from twisted.protocols import basic
 from twisted.python import components
@@ -281,6 +282,16 @@ class MemoryFingerService(service.Service):
         self.users[user] = status
 
 
+@implementer(IFingerService)
+class LocalFingerService(service.Service):
+    def getUser(self, user):
+        # need a local finger daemon running for this to work
+        return utils.getProcessOutput("finger", [user])
+
+    def getUsers(self):
+        return defer.succeed([])
+
+
 def main(): # quitamos la construcción de los factories aquí y los centralizamos en un service
     global application
     application = service.Application("finger", uid=1, gid=1)
@@ -305,9 +316,9 @@ def main(): # quitamos la construcción de los factories aquí y los centralizam
     f.setServiceParent(serviceCollection)
     webfinger.setServiceParent(serviceCollection)
     ircfinger.setServiceParent(serviceCollection)
-    strports.service(
-        "tcp:1079:interface=127.0.0.1", IFingerSetterFactory(f)
-    ).setServiceParent(serviceCollection)
+    # strports.service(
+    #     "tcp:1079:interface=127.0.0.1", IFingerSetterFactory(f)
+    # ).setServiceParent(serviceCollection)
 
 
 if __name__ == 'builtins': # cuando twistd llama a un tac el archivo se llama "builtins"

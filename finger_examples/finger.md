@@ -56,7 +56,7 @@ y para probar el servicio SOAP
 python fingerXRclient.py
 ```
 
-ahora si hacemos gala de lo que puede hacer lainversión de control al cambiar inmediatamente de "backend" de uno de archivo de texto vs uno de memoria
+seguimos con la inversión de control al cambiar inmediatamente de "backend" uno de memoria a uno que se alimenta del finger command, notese que la lista del htnl ya no funciona y el setter se eliminó de los servicios
 
 para los introvertidos que no saben usar el irc acá les dejo una forma de probarlo, yo me instalé uno con docker para probar porque no se como es la comunidad irc [ngircd](https://hub.docker.com/r/linuxserver/ngircd), y de cliente tengo [kvirc](https://www.kvirc.net/) pero la version de portableapps, pero igual son buenas
 
