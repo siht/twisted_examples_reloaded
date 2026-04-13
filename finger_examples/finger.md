@@ -46,7 +46,7 @@ para probar el resultado
 telnet 127.0.0.1 79 # para ver los usuarios
 ```
 
-y en un navegador entrar a localhost:8000/<usuario>
+y en un navegador entrar a localhost:8000/ o https://localhost (versión segura)
 
 y en el irc mandale un mensaje privado a fingerbot ```/msg fingerbot usuario```
 
@@ -64,7 +64,7 @@ python fingerPBclient.py
 ```
 
 
-añadimos un nuevo protocolo llamado perspective broker, nada que ver con message broker, es un protocolo similar a SOAP pero más optimizado
+añadimos un nuevo endpoint pero es de web seguro, segurate de crear tus certificados o usa los mios (la palabra másgica es: phrase), el sentido de este commit es que veas que ya añadir cosas con la estructura correcta lo hace plugable, si escribe un poco más pero la ventaja es el desacoplamiento.
 
 para los introvertidos que no saben usar el irc acá les dejo una forma de probarlo, yo me instalé uno con docker para probar porque no se como es la comunidad irc [ngircd](https://hub.docker.com/r/linuxserver/ngircd), y de cliente tengo [kvirc](https://www.kvirc.net/) pero la version de portableapps, pero igual son buenas
 

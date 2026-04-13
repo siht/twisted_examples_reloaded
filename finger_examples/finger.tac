@@ -265,7 +265,8 @@ def main(): # quitamos la construcción de los factories aquí y los centralizam
     f = FingerService("/etc/users")
     finger = strports.service("tcp:79", IFingerFactory(f)) # no te confundas esto es un servicio como el de arriba
     # solo que está envolviendo a nuestro factory, es un StreamServerEndpointService
-    webfinger = strports.service("tcp:8000", server.Site(resource.IResource(f))) # no lo se pero supongo que Site
+    site = server.Site(resource.IResource(f))
+    webfinger = strports.service("tcp:8000", site) # no lo se pero supongo que Site
     # es un tipo de servicio que acepta resources para mostrar
     i = IIRCClientFactory(f)
     i.nickname = "fingerbot" # asegurate de que el nombre de tu bot no sea muy largo a veces da error y no te notifica
@@ -282,6 +283,9 @@ def main(): # quitamos la construcción de los factories aquí y los centralizam
     ircfinger.setServiceParent(serviceCollection)
     strports.service(
         "tcp:8889", pb.PBServerFactory(IPerspectiveFinger(f))
+    ).setServiceParent(serviceCollection)
+    strports.service(
+        "ssl:port=443:certKey=cert.pem:privateKey=key.pem", site
     ).setServiceParent(serviceCollection)
 
 
