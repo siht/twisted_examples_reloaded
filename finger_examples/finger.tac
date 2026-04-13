@@ -1,5 +1,7 @@
 import email.policy # no tengo idea de porque el xmlrpc falla sin esto, cuando lo corro como un tac
 import html
+import os
+import pwd
 
 from twisted.application import (
     internet,
@@ -288,6 +290,27 @@ class LocalFingerService(service.Service):
         return defer.succeed([])
 
 
+@implementer(IFingerService)
+class FullLocalFingerService(service.Service):
+    def getUser(self, user):
+        user = user.strip()
+        try:
+            entry = pwd.getpwnam(user)
+        except KeyError:
+            return defer.succeed("No such user")
+        try:
+            f = open(os.path.join(entry[5], ".plan"))
+        except OSError:
+            return defer.succeed("No such user")
+        with f:
+            data = f.read()
+        data = data.strip()
+        return defer.succeed(data)
+
+    def getUsers(self):
+        return defer.succeed([])
+
+
 def main(): # quitamos la construcción de los factories aquí y los centralizamos en un service
     global application
     application = service.Application("finger", uid=1, gid=1)
@@ -295,7 +318,8 @@ def main(): # quitamos la construcción de los factories aquí y los centralizam
 
     # f = FingerService("/etc/users")
     # f = MemoryFingerService({b"moshez": b"Happy and well"})
-    f = LocalFingerService()
+    # f = LocalFingerService()
+    f = FullLocalFingerService()
     finger = strports.service("tcp:79", IFingerFactory(f)) # no te confundas esto es un servicio como el de arriba
     # solo que está envolviendo a nuestro factory, es un StreamServerEndpointService
     webfinger = strports.service("tcp:8000", server.Site(resource.IResource(f))) # no lo se pero supongo que Site
