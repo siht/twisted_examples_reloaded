@@ -13,12 +13,34 @@ from twisted.internet import (
     reactor,
 )
 from twisted.protocols import basic
+from twisted.python import components
 from twisted.web import (
     resource,
     server,
     xmlrpc,
 )
 from twisted.words.protocols import irc
+
+from zope.interface import Interface, implementer
+
+
+class IFingerService(Interface):
+    def getUser(user):
+        """
+        Return a deferred returning L{bytes}.
+        """
+
+    def getUsers():
+        """
+        Return a deferred returning a L{list} of L{bytes}.
+        """
+
+
+class IFingerSetterService(Interface):
+    def setUser(user, status):
+        """
+        Set the user's status to something.
+        """
 
 
 class FingerProtocol(basic.LineReceiver):
@@ -34,6 +56,72 @@ class FingerProtocol(basic.LineReceiver):
             self.transport.write(b"Internal error in server\r\n")
         finally:
             self.transport.loseConnection()
+
+
+class IFingerFactory(Interface):
+    def getUser(user):
+        """
+        Return a deferred returning L{bytes}
+        """
+
+    def buildProtocol(addr):
+        """
+        Return a protocol returning L{bytes}
+        """
+
+
+@implementer(IFingerFactory)
+class FingerFactoryFromService(protocol.ServerFactory):
+    protocol = FingerProtocol
+
+    def __init__(self, service):
+        self.service = service
+
+    def getUser(self, user):
+        return self.service.getUser(user)
+
+
+components.registerAdapter(FingerFactoryFromService, IFingerService, IFingerFactory)
+
+
+class FingerSetterProtocol(basic.LineReceiver):
+    def connectionMade(self):
+        self.lines = []
+
+    def lineReceived(self, line):
+        self.lines.append(line)
+
+    def connectionLost(self, reason):
+        if len(self.lines) == 2:
+            self.factory.setUser(*self.lines)
+
+
+class IFingerSetterFactory(Interface):
+    def setUser(user, status):
+        """
+        Return a deferred returning L{bytes}.
+        """
+
+    def buildProtocol(addr):
+        """
+        Return a protocol returning L{bytes}.
+        """
+
+
+@implementer(IFingerSetterFactory)
+class FingerSetterFactoryFromService(protocol.ServerFactory):
+    protocol = FingerSetterProtocol
+
+    def __init__(self, service):
+        self.service = service
+
+    def setUser(self, user, status):
+        self.service.setUser(user, status)
+
+
+components.registerAdapter(
+    FingerSetterFactoryFromService, IFingerSetterService, IFingerSetterFactory
+)
 
 
 class IRCReplyBot(irc.IRCClient):
@@ -55,6 +143,40 @@ class IRCReplyBot(irc.IRCClient):
                 self.msg(b"Internal error in server")
 
 
+class IIRCClientFactory(Interface):
+    """
+    @ivar nickname
+    """
+
+    def getUser(user):
+        """
+        Return a deferred returning a string.
+        """
+
+    def buildProtocol(addr):
+        """
+        Return a protocol.
+        """
+
+
+@implementer(IIRCClientFactory)
+class IRCClientFactoryFromService(protocol.ClientFactory):
+    protocol = IRCReplyBot
+    nickname = None
+
+    def __init__(self, service):
+        self.service = service
+
+    def getUser(self, user):
+        return self.service.getUser(user)
+
+
+components.registerAdapter(
+    IRCClientFactoryFromService, IFingerService, IIRCClientFactory
+)
+
+
+@implementer(resource.IResource)
 class UserStatusTree(resource.Resource):
     def __init__(self, service):
         resource.Resource.__init__(self)
@@ -74,8 +196,13 @@ class UserStatusTree(resource.Resource):
     def getChild(self, path, request):
         if path == b"":
             return UserStatusTree(self.service)
+        elif path == b"RPC2":
+            return UserStatusXR(self.service)
         else:
             return UserStatus(path, self.service)
+
+
+components.registerAdapter(UserStatusTree, IFingerService, resource.IResource)
 
 
 class UserStatus(resource.Resource):
@@ -106,6 +233,7 @@ class UserStatusXR(xmlrpc.XMLRPC):
         return self.service.getUser(user)
 
 
+@implementer(IFingerService)
 class FingerService(service.Service):
     def __init__(self, filename):
         self.users = {}
@@ -136,25 +264,6 @@ class FingerService(service.Service):
     def getUsers(self):
         return defer.succeed(list(self.users.keys()))
 
-    def getFingerFactory(self):
-        f = protocol.ServerFactory()
-        f.protocol = FingerProtocol
-        f.getUser = self.getUser
-        return f
-
-    def getResource(self):
-        r = UserStatusTree(self)
-        x = UserStatusXR(self)
-        r.putChild(b"RPC2", x)
-        return r
-
-    def getIRCBot(self, nickname):
-        f = protocol.ClientFactory()
-        f.protocol = IRCReplyBot
-        f.nickname = nickname
-        f.getUser = self.getUser
-        return f
-
 
 def main(): # quitamos la construcción de los factories aquí y los centralizamos en un service
     global application
@@ -162,15 +271,17 @@ def main(): # quitamos la construcción de los factories aquí y los centralizam
     serviceCollection = service.IServiceCollection(application) # ves es el multiservice
 
     f = FingerService("/etc/users")
-    finger = strports.service("tcp:79", f.getFingerFactory()) # no te confundas esto es un servicio como el de arriba
+    finger = strports.service("tcp:79", IFingerFactory(f)) # no te confundas esto es un servicio como el de arriba
     # solo que está envolviendo a nuestro factory, es un StreamServerEndpointService
-    webfinger = strports.service("tcp:8000", server.Site(f.getResource())) # no lo se pero supongo que Site
+    webfinger = strports.service("tcp:8000", server.Site(resource.IResource(f))) # no lo se pero supongo que Site
     # es un tipo de servicio que acepta resources para mostrar
+    i = IIRCClientFactory(f)
+    i.nickname = "fingerbot" # asegurate de que el nombre de tu bot no sea muy largo a veces da error y no te notifica
     ircfinger = internet.ClientService( # antiguo freenode o liberachat
         #endpoints.clientFromString(reactor, "tcp:irc.freenode.org:6667"), 
         #endpoints.clientFromString(reactor, "tcp:irc.liberachat.chat:6667"), 
         endpoints.clientFromString(reactor, "tcp:127.0.0.1:6667"), # yo mejor me instalo mi propio server de irc para no molestar
-        f.getIRCBot("fingerbot"), # asegurate de que el nombre de tu bot no sea muy largo a veces da error y no te notifica
+        i
     )
 
     finger.setServiceParent(serviceCollection)

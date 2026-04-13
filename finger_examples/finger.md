@@ -56,7 +56,7 @@ y para probar el servicio SOAP
 python fingerXRclient.py
 ```
 
-no hemos cambiado la funcionalidad, pero si el orden del código separando intereses
+no hemos cambiado la funcionalidad aunque haya regresado el fingersetter, no te confundas, no se ha implementado, pero si el orden del código separando intereses, pero ahora con esteroides porque stamos usando interfaces e inversión de control
 
 para los introvertidos que no saben usar el irc acá les dejo una forma de probarlo, yo me instalé uno con docker para probar porque no se como es la comunidad irc [ngircd](https://hub.docker.com/r/linuxserver/ngircd), y de cliente tengo [kvirc](https://www.kvirc.net/) pero la version de portableapps, pero igual son buenas
 
