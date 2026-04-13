@@ -46,6 +46,10 @@ para probar el resultado
 telnet 127.0.0.1 79 # para ver los usuarios
 ```
 
-ahora hacemos un servicio que lea desde un archivo, y como el ejemplo no tiene un ejemplo de como insertar en el archivo nosotros tampoc haremos el intento (bueno, yo no)
+y en un navegador entrar a localhost:8000/<usuario>, 
+
+
+
+ahora le agregamos un recurso html, por el puerto 8000
 
 cabe notar que ese archivo lo tengo en el archivo /etc/users (texto plano) con un formato "usuario:mensaje" separadao por saltos de línea

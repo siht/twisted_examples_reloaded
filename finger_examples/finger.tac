@@ -1,15 +1,20 @@
+import html
+
 from twisted.application import (
     service,
     strports,
 )
-
 from twisted.internet import (
     defer,
     protocol,
     reactor,
 )
-
 from twisted.protocols import basic
+from twisted.web import (
+    resource,
+    server,
+    static,
+)
 
 
 class FingerProtocol(basic.LineReceiver):
@@ -26,6 +31,32 @@ class FingerProtocol(basic.LineReceiver):
             self.transport.loseConnection()
 
         d.addCallback(writeResponse) # agregamos el callback de caso exitoso
+
+
+class FingerResource(resource.Resource):
+    def __init__(self, users):
+        self.users = users
+        resource.Resource.__init__(self)
+
+    # we treat the path as the username
+    def getChild(self, username, request):
+        """
+        'username' is L{bytes}.
+        'request' is a 'twisted.web.server.Request'.
+        """
+        messagevalue = self.users.get(username)
+        if messagevalue:
+            messagevalue = messagevalue.decode("ascii")
+        if type(username) == bytes:
+            username = username.decode("ascii")
+        username = html.escape(username)
+        if messagevalue is not None:
+            messagevalue = html.escape(messagevalue)
+            text = f"<h1>{username}</h1><p>{messagevalue}</p>"
+        else:
+            text = f"<h1>{username}</h1><p>No such user</p>"
+        text = text.encode("ascii")
+        return static.Data(text, "text/html")
 
 
 class FingerService(service.Service):
@@ -59,6 +90,10 @@ class FingerService(service.Service):
         f.getUser = self.getUser
         return f
 
+    def getResource(self):
+        r = FingerResource(self.users)
+        return r
+
 
 def main(): # quitamos la construcción de los factories aquí y los centralizamos en un service
     global application
@@ -68,9 +103,12 @@ def main(): # quitamos la construcción de los factories aquí y los centralizam
     f = FingerService("/etc/users")
     finger = strports.service("tcp:79", f.getFingerFactory()) # no te confundas esto es un servicio como el de arriba
     # solo que está envolviendo a nuestro factory, es un StreamServerEndpointService
+    webfinger = strports.service("tcp:8000", server.Site(f.getResource())) # no lo se pero supongo que Site
+    # es un tipo de servicio que acepta resources para mostrar
 
     finger.setServiceParent(serviceCollection)
     f.setServiceParent(serviceCollection)
+    webfinger.setServiceParent(serviceCollection)
 
 
 if __name__ == 'builtins': # cuando twistd llama a un tac el archivo se llama "builtins"
