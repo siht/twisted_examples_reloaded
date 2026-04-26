@@ -1,0 +1,68 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>WS Echo Test</title>
+    <style>
+        body { font-family: sans-serif; margin: 20px; background: #f4f4f9; }
+        #log { background: #fff; border: 1px solid #ccc; height: 200px; overflow-y: scroll; padding: 10px; margin-top: 10px; border-radius: 4px; }
+        .controls { display: flex; gap: 10px; }
+        input { flex-grow: 1; padding: 8px; border: 1px solid #ccc; border-radius: 4px; }
+        button { padding: 8px 16px; cursor: pointer; background: #007bff; color: white; border: none; border-radius: 4px; }
+        button:hover { background: #0056b3; }
+    </style>
+</head>
+<body>
+
+    <h2>WebSocket Echo Server Test</h2>
+    
+    <div class="controls">
+        <input type="text" id="messageInput" placeholder="Escribe algo aquí..." onkeydown="if(event.key==='Enter') sendMessage()">
+        <button onclick="sendMessage()">Enviar</button>
+    </div>
+
+    <div id="log"></div>
+
+    <script>
+        const logDiv = document.getElementById('log');
+        const input = document.getElementById('messageInput');
+        
+        // Nos conectamos al servidor que definiste en el puerto 9000
+        const socket = new WebSocket('ws://127.0.0.1:9000');
+
+        socket.onopen = () => {
+            addLog("<i>Conectado al servidor...</i>");
+        };
+
+        socket.onmessage = (event) => {
+            // Aquí agregamos el prefijo que pediste
+            addLog(`<b>ws echo server says:</b> ${event.data}`);
+        };
+
+        socket.onclose = () => {
+            addLog("<span style='color:red;'>Conexión cerrada.</span>");
+        };
+
+        socket.onerror = (error) => {
+            addLog(`<span style='color:red;'>Error: ${error.message}</span>`);
+        };
+
+        function sendMessage() {
+            const message = input.value;
+            if (message && socket.readyState === WebSocket.OPEN) {
+                socket.send(message);
+                input.value = '';
+            }
+        }
+
+        function addLog(msg) {
+            const p = document.createElement('p');
+            p.innerHTML = msg;
+            p.style.margin = "5px 0";
+            logDiv.appendChild(p);
+            logDiv.scrollTop = logDiv.scrollHeight; // Auto-scroll
+        }
+    </script>
+</body>
+</html>
