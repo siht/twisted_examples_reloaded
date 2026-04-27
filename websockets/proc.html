@@ -1,0 +1,46 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Twisted Monitor</title>
+    <style>
+        body { font-family: sans-serif; background: #222; color: #eee; text-align: center; }
+        .stat-card { border: 1px solid #444; padding: 20px; margin: 10px; display: inline-block; border-radius: 8px; }
+        .value { font-size: 2em; color: #0f0; }
+    </style>
+</head>
+<body>
+    <h1>System Stats (Real-time)</h1>
+    
+    <div class="stat-card">
+        <h3>CPU</h3>
+        <div id="cpu" class="value">0%</div>
+    </div>
+    
+    <div class="stat-card">
+        <h3>RAM</h3>
+        <div id="ram" class="value">0%</div>
+    </div>
+
+    <script>
+        // 1. Iniciamos la conexión (El "Protocolo" del navegador)
+        const socket = new WebSocket('ws://localhost:9000');
+
+        // 2. Manejo de eventos
+        socket.onopen = () => console.log('Conectado al servidor de Twisted');
+
+        socket.onmessage = (event) => {
+            // 3. Tu "Caso de Uso" en el cliente: parsear y mostrar
+            const data = JSON.parse(event.data);
+            
+            document.getElementById('cpu').innerText = data.cpu_percent + '%';
+            document.getElementById('ram').innerText = data.memory_percent + '%';
+            
+            console.log('Data recibida:', data);
+        };
+
+        socket.onclose = () => console.log('Conexión cerrada');
+        socket.onerror = (error) => console.error('Error:', error);
+    </script>
+</body>
+</html>
